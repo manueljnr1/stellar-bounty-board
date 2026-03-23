@@ -18,6 +18,7 @@ import {
   submitBountySchema,
   zodErrorMessage,
 } from "./validation/schemas";
+import { limiter } from "./utils";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
@@ -46,7 +47,7 @@ app.get("/api/bounties", (_req: Request, res: Response) => {
   res.json({ data: listBounties() });
 });
 
-app.post("/api/bounties", (req: Request, res: Response) => {
+app.post("/api/bounties", limiter, (req: Request, res: Response) => {
   const parsed = createBountySchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: zodErrorMessage(parsed.error) });
@@ -61,7 +62,7 @@ app.post("/api/bounties", (req: Request, res: Response) => {
   }
 });
 
-app.post("/api/bounties/:id/reserve", (req: Request, res: Response) => {
+app.post("/api/bounties/:id/reserve",limiter, (req: Request, res: Response) => {
   const parsedBody = reserveBountySchema.safeParse(req.body);
   if (!parsedBody.success) {
     res.status(400).json({ error: zodErrorMessage(parsedBody.error) });
@@ -76,7 +77,7 @@ app.post("/api/bounties/:id/reserve", (req: Request, res: Response) => {
   }
 });
 
-app.post("/api/bounties/:id/submit", (req: Request, res: Response) => {
+app.post("/api/bounties/:id/submit",limiter, (req: Request, res: Response) => {
   const parsedBody = submitBountySchema.safeParse(req.body);
   if (!parsedBody.success) {
     res.status(400).json({ error: zodErrorMessage(parsedBody.error) });
@@ -96,7 +97,7 @@ app.post("/api/bounties/:id/submit", (req: Request, res: Response) => {
   }
 });
 
-app.post("/api/bounties/:id/release", (req: Request, res: Response) => {
+app.post("/api/bounties/:id/release",limiter, (req: Request, res: Response) => {
   const parsedBody = maintainerActionSchema.safeParse(req.body);
   if (!parsedBody.success) {
     res.status(400).json({ error: zodErrorMessage(parsedBody.error) });
@@ -111,7 +112,7 @@ app.post("/api/bounties/:id/release", (req: Request, res: Response) => {
   }
 });
 
-app.post("/api/bounties/:id/refund", (req: Request, res: Response) => {
+app.post("/api/bounties/:id/refund",limiter, (req: Request, res: Response) => {
   const parsedBody = maintainerActionSchema.safeParse(req.body);
   if (!parsedBody.success) {
     res.status(400).json({ error: zodErrorMessage(parsedBody.error) });
