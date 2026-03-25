@@ -35,10 +35,11 @@ Contract (`contracts`)
 - Soroban Rust contract scaffold
 - Escrow-style bounty lifecycle methods
 
-
 ## Deployment Guide
 
 See [docs/deployment.md](docs/deployment.md) for step-by-step instructions to deploy the backend on Render and the frontend on Vercel, including required environment variables, health check paths, and troubleshooting tips.
+
+For detailed architecture diagrams and data flow documentation, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## API Overview
 
@@ -72,6 +73,28 @@ Build:
 
 ```bash
 npm run build
+```
+
+## Testing
+
+Backend tests cover the JSON-backed bounty lifecycle (create, reserve, submit, release, refund, expiration) and the main HTTP routes. They use a temporary store file via `BOUNTY_STORE_PATH` and disable strict rate limiting when `NODE_ENV=test`.
+
+From the repository root (after `npm run install:all`):
+
+```bash
+npm test
+```
+
+Watch mode during development:
+
+```bash
+npm run test:watch
+```
+
+Coverage report (Istanbul via Vitest):
+
+```bash
+npm run test:coverage
 ```
 
 ## Contract Notes
