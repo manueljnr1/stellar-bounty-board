@@ -35,12 +35,24 @@ Contract (`contracts`)
 - Soroban Rust contract scaffold
 - Escrow-style bounty lifecycle methods
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 631432f (feat(worker): add Soroban contract event indexer worker, normalization, and docs (#26))
 ## Deployment Guide
 
 See [docs/deployment.md](docs/deployment.md) for step-by-step instructions to deploy the backend on Render and the frontend on Vercel, including required environment variables, health check paths, and troubleshooting tips.
 
 For detailed architecture diagrams and data flow documentation, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+<<<<<<< HEAD
+=======
+## Contract Event Indexer Worker
+
+The backend includes an isolated worker for indexing Soroban contract events. See [backend/worker/README.md](backend/worker/README.md) for details on running and extending the indexer.
+
+>>>>>>> 631432f (feat(worker): add Soroban contract event indexer worker, normalization, and docs (#26))
 ## API Overview
 
 Base URL:
