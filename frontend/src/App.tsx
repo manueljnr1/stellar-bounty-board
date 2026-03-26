@@ -43,6 +43,38 @@ const statusOptions: Array<{ value: "all" | BountyStatus; label: string }> = [
   { value: "expired", label: "Expired" },
 ];
 
+const statusOptionValues = new Set(statusOptions.map((option) => option.value));
+
+function readInitialFilters(): {
+  searchQuery: string;
+  statusFilter: "all" | BountyStatus;
+  minReward: string;
+  maxReward: string;
+} {
+  if (typeof window === "undefined") {
+    return {
+      searchQuery: "",
+      statusFilter: "all",
+      minReward: "",
+      maxReward: "",
+    };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const rawStatus = params.get("status");
+  const statusFilter =
+    rawStatus && statusOptionValues.has(rawStatus as "all" | BountyStatus)
+      ? (rawStatus as "all" | BountyStatus)
+      : "all";
+
+  return {
+    searchQuery: params.get("search") ?? "",
+    statusFilter,
+    minReward: params.get("minReward") ?? "",
+    maxReward: params.get("maxReward") ?? "",
+  };
+}
+
 function formatRelativeDeadline(deadlineAt: number): string {
   const now = Math.floor(Date.now() / 1000);
   const diff = deadlineAt - now;
@@ -58,16 +90,17 @@ function shortAddress(value: string): string {
 }
 
 function App() {
+  const initialFilters = useMemo(() => readInitialFilters(), []);
   const [form, setForm] = useState<CreateBountyPayload>(initialForm);
   const [bounties, setBounties] = useState<Bounty[]>([]);
   const [issues, setIssues] = useState<OpenIssue[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | BountyStatus>("all");
-  const [minReward, setMinReward] = useState("");
-  const [maxReward, setMaxReward] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialFilters.searchQuery);
+  const [statusFilter, setStatusFilter] = useState<"all" | BountyStatus>(initialFilters.statusFilter);
+  const [minReward, setMinReward] = useState(initialFilters.minReward);
+  const [maxReward, setMaxReward] = useState(initialFilters.maxReward);
 
   async function refresh(): Promise<void> {
     const [bountyData, issueData] = await Promise.all([listBounties(), listOpenIssues()]);
@@ -101,6 +134,43 @@ function App() {
       active = false;
       window.clearInterval(timer);
     };
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+
+    if (searchQuery.trim() !== "") {
+      params.set("search", searchQuery);
+    }
+
+    if (statusFilter !== "all") {
+      params.set("status", statusFilter);
+    }
+
+    if (minReward !== "") {
+      params.set("minReward", minReward);
+    }
+
+    if (maxReward !== "") {
+      params.set("maxReward", maxReward);
+    }
+
+    const nextSearch = params.toString();
+    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`;
+    window.history.replaceState(null, "", nextUrl);
+  }, [maxReward, minReward, searchQuery, statusFilter]);
+
+  useEffect(() => {
+    function handlePopState() {
+      const filters = readInitialFilters();
+      setSearchQuery(filters.searchQuery);
+      setStatusFilter(filters.statusFilter);
+      setMinReward(filters.minReward);
+      setMaxReward(filters.maxReward);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
   const metrics = useMemo(() => {
