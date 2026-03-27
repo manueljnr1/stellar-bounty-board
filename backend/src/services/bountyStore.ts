@@ -1,9 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  getNotificationService,
-  createNotificationPayload,
-  type NotificationEvent,
+
 } from "./notificationService";
 
 export type BountyStatus =
@@ -187,6 +185,24 @@ export function createBounty(input: CreateBountyInput): BountyRecord {
   };
 
   writeStore([bounty, ...records]);
+
+  // Trigger notification on create
+  const recipients: NotificationRecipient[] = [
+    { role: 'maintainer', address: input.maintainer },
+  ];
+  
+  // Non-blocking: notifications fire-and-forget
+  sendNotification(recipients, 'bounty_created', {
+    bountyId: bounty.id,
+    repo: bounty.repo,
+    issueNumber: bounty.issueNumber,
+    title: bounty.title,
+    status: bounty.status,
+    maintainer: input.maintainer,
+    amount: bounty.amount,
+    tokenSymbol: bounty.tokenSymbol,
+  }).catch(err => console.warn('[createBounty] Notification failed (non-blocking):', err));
+
   return bounty;
 }
 
@@ -205,17 +221,7 @@ export function reserveBounty(id: string, contributor: string): BountyRecord {
     reservedAt: nowInSeconds(),
   };
 
-  const result = persistUpdated(records, updated);
 
-  // Trigger notification (fire and forget)
-  const notificationService = getNotificationService();
-  notificationService.send(
-    createNotificationPayload("bounty_reserved", result, { contributor })
-  ).catch(() => {
-    // Fail silently - notifications should not break core functionality
-  });
-
-  return result;
 }
 
 export function submitBounty(
@@ -242,17 +248,7 @@ export function submitBounty(
     notes,
   };
 
-  const result = persistUpdated(records, updated);
 
-  // Trigger notification (fire and forget)
-  const notificationService = getNotificationService();
-  notificationService.send(
-    createNotificationPayload("bounty_submitted", result, { submissionUrl, notes })
-  ).catch(() => {
-    // Fail silently - notifications should not break core functionality
-  });
-
-  return result;
 }
 
 export function releaseBounty(id: string, maintainer: string, transactionHash?: string): BountyRecord {
@@ -273,17 +269,7 @@ export function releaseBounty(id: string, maintainer: string, transactionHash?: 
     releasedTxHash: transactionHash?.trim() ? transactionHash.trim() : bounty.releasedTxHash,
   };
 
-  const result = persistUpdated(records, updated);
 
-  // Trigger notification (fire and forget)
-  const notificationService = getNotificationService();
-  notificationService.send(
-    createNotificationPayload("bounty_released", result)
-  ).catch(() => {
-    // Fail silently - notifications should not break core functionality
-  });
-
-  return result;
 }
 
 export function refundBounty(id: string, maintainer: string, transactionHash?: string): BountyRecord {
@@ -307,16 +293,6 @@ export function refundBounty(id: string, maintainer: string, transactionHash?: s
     refundedTxHash: transactionHash?.trim() ? transactionHash.trim() : bounty.refundedTxHash,
   };
 
-  const result = persistUpdated(records, updated);
 
-  // Trigger notification (fire and forget)
-  const notificationService = getNotificationService();
-  notificationService.send(
-    createNotificationPayload("bounty_refunded", result)
-  ).catch(() => {
-    // Fail silently - notifications should not break core functionality
-  });
-
-  return result;
 }
 
