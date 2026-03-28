@@ -18,11 +18,15 @@ import {
   zodErrorMessage,
 } from "./validation/schemas";
 import { limiter } from "./utils";
+import {
+  captureRawBody,
+  createGitHubWebhookSignatureMiddleware,
+} from "./webhooks/signatureVerification";
 
 export const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ verify: captureRawBody }));
 
 function parseId(raw: string | string[] | undefined): string {
   return bountyIdSchema.parse(Array.isArray(raw) ? raw[0] : raw);
@@ -198,6 +202,20 @@ app.post("/api/bounties/:id/refund", limiter, (req: Request, res: Response) => {
     sendError(res, error);
   }
 });
+
+app.post(
+  "/api/webhooks/github",
+  createGitHubWebhookSignatureMiddleware(() => process.env.GITHUB_WEBHOOK_SECRET),
+  (_req: Request, res: Response) => {
+    res.status(202).json({
+      data: {
+        authenticated: true,
+        provider: "github",
+        received: true,
+      },
+    });
+  },
+);
 
 app.get("/api/open-issues", (_req: Request, res: Response) => {
   res.json({ data: listOpenIssues() });
