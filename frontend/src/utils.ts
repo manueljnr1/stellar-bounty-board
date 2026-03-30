@@ -1,6 +1,18 @@
 import { Bounty, BountyStatus } from "./types";
 import { FilterState } from "./constants";
 
+// Simple debounce function for search
+export function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  delay: number
+): (...args: Parameters<T>) => void {
+  let timeoutId: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+}
+
 export function getUniqueRepos(bounties: Bounty[]): string[] {
   const repos = new Set(bounties.map((bounty) => bounty.repo));
   return Array.from(repos).sort();
@@ -76,6 +88,45 @@ export function getRewardBounds(bounties: Bounty[]): { lowest: number; highest: 
     lowest: Math.min(...amounts),
     highest: Math.max(...amounts),
   };
+}
+
+export type SortOption = "reward-high" | "reward-low" | "deadline-soonest" | "deadline-latest" | "newest" | "oldest";
+
+export interface SortState {
+  option: SortOption;
+  direction: "asc" | "desc";
+}
+
+export function sortBounties(bounties: Bounty[], sort: SortState): Bounty[] {
+  const sorted = [...bounties].sort((a, b) => {
+    let comparison = 0;
+    
+    switch (sort.option) {
+      case "reward-high":
+        comparison = b.amount - a.amount;
+        break;
+      case "reward-low":
+        comparison = a.amount - b.amount;
+        break;
+      case "deadline-soonest":
+        comparison = a.deadlineAt - b.deadlineAt;
+        break;
+      case "deadline-latest":
+        comparison = b.deadlineAt - a.deadlineAt;
+        break;
+      case "newest":
+        comparison = b.createdAt - a.createdAt;
+        break;
+      case "oldest":
+        comparison = b.createdAt - b.createdAt;
+        break;
+    }
+    
+    // Apply direction
+    return sort.direction === "asc" ? comparison : -comparison;
+  });
+  
+  return sorted;
 }
 
 export function getActiveRewardLabel(

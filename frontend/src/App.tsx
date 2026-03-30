@@ -6,16 +6,20 @@ import {
   ExternalLink,
   FileText,
   Filter,
+  FolderGit2,
   GitBranch,
   HandCoins,
   Plus,
+  Rocket,
   Search,
+  ShieldCheck,
   SlidersHorizontal,
   Star,
   Trash2,
   Upload,
-  User,
+  UserRound,
   X,
+  ArrowUpDown,
 } from "lucide-react";
 import {
   createBounty,
@@ -29,8 +33,8 @@ import {
 } from "./api";
 import { BountyRecommendation, ContributorProfile, createDefaultProfile, generateRecommendations, updateProfileFromBounties } from "./recommendations";
 import RecommendedBounties from "./RecommendedBounties";
-import { statusCopy, actionCopy, readInitialFilters, FilterState, statusOptions, statusGlossary } from "./constants";
-import { filterBounties, getRewardBounds, getActiveRewardLabel, getContributorMetrics, getUniqueRepos, getRepoMetrics } from "./utils";
+import { statusCopy, actionCopy, readInitialFilters, FilterState, statusOptions, statusGlossary, sortOptions } from "./constants";
+import { filterBounties, getRewardBounds, getActiveRewardLabel, getContributorMetrics, getUniqueRepos, getRepoMetrics, sortBounties, debounce } from "./utils";
 import { Bounty, CreateBountyPayload, OpenIssue, BountyStatus } from "./types";
 
 import GitHubIssuePreviewCard from "./GitHubIssuePreviewCard";
@@ -147,10 +151,20 @@ function App() {
   const [error, setError] = useState<string | null>(null);
 n
   const [searchQuery, setSearchQuery] = useState(initialFilters.searchQuery);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(initialFilters.searchQuery);
+  
+  // Debounced search update
+  const debouncedSetSearchQuery = useMemo(() => debounce(setDebouncedSearchQuery, 300), []);
+  
+  useEffect(() => {
+    debouncedSetSearchQuery(searchQuery);
+  }, [searchQuery, debouncedSetSearchQuery]);
   const [statusFilter, setStatusFilter] = useState<"all" | BountyStatus>(initialFilters.statusFilter);
   const [minReward, setMinReward] = useState(initialFilters.minReward);
   const [maxReward, setMaxReward] = useState(initialFilters.maxReward);
   const [repoFilter, setRepoFilter] = useState(initialFilters.repoFilter);
+  const [sortOption, setSortOption] = useState(initialFilters.sortOption);
+  const [sortDirection, setSortDirection] = useState(initialFilters.sortDirection);
   const [pathname, setPathname] = useState(window.location.pathname);
   const [profileContributor, setProfileContributor] = useState("");
   const [profileStatus, setProfileStatus] = useState<"all" | BountyStatus>("all");
@@ -195,8 +209,8 @@ n
     if (pathname.startsWith("/bounties/") || pathname.startsWith("/repo/")) return;
     const params = new URLSearchParams();
 
-    if (searchQuery.trim() !== "") {
-      params.set("search", searchQuery);
+    if (debouncedSearchQuery.trim() !== "") {
+      params.set("search", debouncedSearchQuery);
     }
 
     if (statusFilter !== "all") {
@@ -215,10 +229,18 @@ n
       params.set("repo", repoFilter);
     }
 
+    if (sortOption !== "newest") {
+      params.set("sort", sortOption);
+    }
+
+    if (sortDirection !== "desc") {
+      params.set("direction", sortDirection);
+    }
+
     const nextSearch = params.toString();
     const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`;
     window.history.replaceState(null, "", nextUrl);
-  }, [maxReward, minReward, pathname, searchQuery, statusFilter, repoFilter]);
+  }, [maxReward, minReward, pathname, debouncedSearchQuery, statusFilter, repoFilter, sortOption, sortDirection]);
 
   useEffect(() => {
     function handlePopState() {
@@ -232,6 +254,8 @@ n
       setMinReward(filters.minReward);
       setMaxReward(filters.maxReward);
       setRepoFilter(filters.repoFilter);
+      setSortOption(filters.sortOption);
+      setSortDirection(filters.sortDirection);
     }
 
     window.addEventListener("popstate", handlePopState);
@@ -299,6 +323,8 @@ n
     setMinReward("");
     setMaxReward("");
     setRepoFilter("");
+    setSortOption("newest");
+    setSortDirection("desc");
   }
 
   async function handleExportReleasedPayouts() {
@@ -393,14 +419,17 @@ n
 
   const filteredBounties = useMemo(() => {
     const effectiveRepoFilter = repoRoute ? `${repoRoute.owner}/${repoRoute.name}` : repoFilter;
-    return filterBounties(bounties, {
-      searchQuery,
+    const filtered = filterBounties(bounties, {
+      searchQuery: debouncedSearchQuery,
       statusFilter,
       minReward,
       maxReward,
       repoFilter: effectiveRepoFilter,
     });
-  }, [bounties, searchQuery, statusFilter, minReward, maxReward, repoFilter, repoRoute]);
+    
+    // Apply sorting
+    return sortBounties(filtered, { option: sortOption, direction: sortDirection });
+  }, [bounties, debouncedSearchQuery, statusFilter, minReward, maxReward, repoFilter, repoRoute, sortOption, sortDirection]);
 
   if (detailId) {
     const bounty = detailBounty;
@@ -837,6 +866,31 @@ n
                   placeholder={rewardBounds.highest > 0 ? `${rewardBounds.highest}` : "No limit"}
                 />
               </label>
+
+              <label className="filter-field">
+                <span>Sort by</span>
+                <div className="input-with-icon">
+                  <ArrowUpDown size={16} />
+                  <select
+                    value={sortOption}
+                    onChange={(event) => {
+                      const newOption = event.target.value as SortOption;
+                      setSortOption(newOption);
+                      // Set default direction for this sort option
+                      const optionConfig = sortOptions.find(opt => opt.value === newOption);
+                      if (optionConfig) {
+                        setSortDirection(optionConfig.direction);
+                      }
+                    }}
+                  >
+                    {sortOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </label>
             </div>
 
             <div className="active-range" aria-live="polite">
@@ -1004,7 +1058,26 @@ n
             </div>
           ))}
             <div className="empty-state">
-              No bounties match the current search, status, and reward range filters.
+              <div className="empty-state__content">
+                <h3>No bounties found</h3>
+                <p>
+                  {debouncedSearchQuery && (
+                    <>No bounties match "<strong>{debouncedSearchQuery}</strong>"</>
+                  ) || statusFilter !== "all" || minReward || maxReward || repoFilter ? (
+                    <>No bounties match the current filters</>
+                  ) : (
+                    <>No bounties available yet</>
+                  )}
+                </p>
+                <div className="empty-state__suggestions">
+                  <p><strong>Suggestions:</strong></p>
+                  <ul>
+                    <li>Try adjusting your search terms or filters</li>
+                    <li>Check back later for new bounties</li>
+                    <li>Browse all repositories to see available opportunities</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           )}
         </section>

@@ -1,4 +1,5 @@
 import { BountyStatus } from "./types";
+import { SortOption, SortState } from "./utils";
 
 export const STELLAR_PUBLIC_KEY_REGEX = /^G[A-Z0-9]{55}$/;
 export const STELLAR_PUBLIC_KEY_HINT = "Enter a Stellar public key (starts with 'G', 56 characters)";
@@ -40,6 +41,15 @@ export const statusOptions = [
   { value: "expired", label: "Expired" },
 ];
 
+export const sortOptions = [
+  { value: "newest", label: "Newest first", direction: "desc" as const },
+  { value: "oldest", label: "Oldest first", direction: "asc" as const },
+  { value: "reward-high", label: "Highest reward", direction: "desc" as const },
+  { value: "reward-low", label: "Lowest reward", direction: "asc" as const },
+  { value: "deadline-soonest", label: "Deadline soonest", direction: "asc" as const },
+  { value: "deadline-latest", label: "Deadline latest", direction: "desc" as const },
+];
+
 export const statusGlossary = Object.entries(statusCopy).map(([status, info]) => ({
   status,
   label: info.label,
@@ -52,6 +62,8 @@ export interface FilterState {
   minReward: string;
   maxReward: string;
   repoFilter: string;
+  sortOption: SortOption;
+  sortDirection: "asc" | "desc";
 }
 
 export function readInitialFilters(): FilterState {
@@ -62,6 +74,8 @@ export function readInitialFilters(): FilterState {
     minReward: params.get("minReward") ?? "",
     maxReward: params.get("maxReward") ?? "",
     repoFilter: params.get("repo") ?? "",
+    sortOption: (params.get("sort") as SortOption) ?? "newest",
+    sortDirection: (params.get("direction") as "asc" | "desc") ?? "desc",
   };
 }
 
