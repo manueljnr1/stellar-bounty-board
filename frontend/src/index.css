@@ -989,3 +989,150 @@ select {
     justify-content: center;
   }
 }
+
+/* ---- Submission checklist modal ---- */
+
+.submission-modal {
+  border: none;
+  border-radius: 28px;
+  padding: 0;
+  background: var(--surface-strong);
+  box-shadow: 0 32px 100px rgba(60, 43, 17, 0.22);
+  max-width: 540px;
+  width: calc(100% - 32px);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.submission-modal::backdrop {
+  background: rgba(31, 36, 33, 0.48);
+  backdrop-filter: blur(4px);
+}
+
+.submission-modal__inner {
+  padding: 28px;
+  display: grid;
+  gap: 18px;
+}
+
+.submission-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.submission-modal__header h2 {
+  margin: 6px 0 0;
+  font-size: 1.4rem;
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.modal-close-btn:hover {
+  background: rgba(54, 63, 59, 0.08);
+  color: var(--ink);
+}
+
+.submission-modal__intro {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.submission-modal__form {
+  display: grid;
+  gap: 14px;
+}
+
+.checklist-fieldset {
+  border: 1px solid rgba(54, 63, 59, 0.12);
+  border-radius: 18px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.checklist-fieldset legend {
+  font-family: "IBM Plex Mono", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 0 6px;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.checklist-item__toggle {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--muted);
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: color 140ms ease;
+}
+
+.checklist-item__toggle--checked {
+  color: var(--mint);
+}
+
+.checklist-item__toggle:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.checklist-item__text {
+  display: grid;
+  gap: 2px;
+}
+
+.checklist-item__text label {
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.checklist-item__label--done {
+  text-decoration: line-through;
+  color: var(--muted) !important;
+}
+
+.submission-modal__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+@media (max-width: 480px) {
+  .submission-modal__actions {
+    flex-direction: column-reverse;
+  }
+
+  .submission-modal__actions button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ---- End submission checklist modal ---- */

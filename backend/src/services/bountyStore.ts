@@ -10,7 +10,26 @@ export type BountyStatus =
   | "refunded"
   | "expired";
 
+export type BountyTransitionType = "reserve" | "submit" | "release" | "refund" | "expire";
 
+export type AuditMetadataValue = string | number | boolean | null;
+
+export interface BountyEvent {
+  type: "created" | "reserved" | "submitted" | "released" | "refunded" | "expired";
+  timestamp: number;
+  actor?: string;
+  details?: Record<string, unknown>;
+}
+
+export interface BountyAuditLogRecord {
+  id: string;
+  bountyId: string;
+  fromStatus: BountyStatus;
+  toStatus: BountyStatus;
+  transition: BountyTransitionType;
+  actor: string;
+  timestamp: number;
+  metadata?: Record<string, AuditMetadataValue>;
 }
 
 export interface BountyRecord {
@@ -541,6 +560,113 @@ export function refundBounty(id: string, maintainer: string, transactionHash?: s
   return persisted;
 }
 
+export interface AuditLogPage {
+  data: BountyAuditLogRecord[];
+  pagination: {
+    limit: number;
+    offset: number;
+    total: number;
+    hasMore: boolean;
+    nextOffset: number | null;
+  };
+}
 
+export function listBountyAuditLogs(
+  bountyId: string,
+  options: { limit?: number; offset?: number } = {},
+): AuditLogPage {
+  const { limit = 20, offset = 0 } = options;
+  const all = readAuditStore().filter((log) => log.bountyId === bountyId);
+  const total = all.length;
+  const data = all.slice(offset, offset + limit);
+  const hasMore = offset + limit < total;
+  return {
+    data,
+    pagination: {
+      limit,
+      offset,
+      total,
+      hasMore,
+      nextOffset: hasMore ? offset + limit : null,
+    },
+  };
+}
+
+export function getBountyEvents(bountyId: string): BountyEvent[] {
+  const records = listBounties();
+  const bounty = records.find((b) => b.id === bountyId);
+  if (!bounty) {
+    throw new Error(`Bounty ${bountyId} not found.`);
+  }
+  return bounty.events ?? [];
+}
+
+export interface MaintainerMetrics {
+  totalBounties: number;
+  openCount: number;
+  reservedCount: number;
+  submittedCount: number;
+  releasedCount: number;
+  refundedCount: number;
+  expiredCount: number;
+  totalFunded: number;
+  totalReleased: number;
+  averageRewardAmount: number;
+}
+
+export function getMaintainerMetrics(maintainer: string): MaintainerMetrics {
+  const bounties = listBounties().filter((b) => b.maintainer === maintainer);
+  const totalFunded = bounties.reduce((sum, b) => sum + b.amount, 0);
+  const released = bounties.filter((b) => b.status === "released");
+  const totalReleased = released.reduce((sum, b) => sum + b.amount, 0);
+  return {
+    totalBounties: bounties.length,
+    openCount: bounties.filter((b) => b.status === "open").length,
+    reservedCount: bounties.filter((b) => b.status === "reserved").length,
+    submittedCount: bounties.filter((b) => b.status === "submitted").length,
+    releasedCount: released.length,
+    refundedCount: bounties.filter((b) => b.status === "refunded").length,
+    expiredCount: bounties.filter((b) => b.status === "expired").length,
+    totalFunded,
+    totalReleased,
+    averageRewardAmount: bounties.length > 0 ? totalFunded / bounties.length : 0,
+  };
+}
+
+export interface GlobalMetrics {
+  totalBounties: number;
+  openCount: number;
+  reservedCount: number;
+  submittedCount: number;
+  releasedCount: number;
+  refundedCount: number;
+  expiredCount: number;
+  totalFunded: number;
+  totalReleased: number;
+  uniqueMaintainers: number;
+  uniqueContributors: number;
+}
+
+export function getGlobalMetrics(): GlobalMetrics {
+  const bounties = listBounties();
+  const totalFunded = bounties.reduce((sum, b) => sum + b.amount, 0);
+  const released = bounties.filter((b) => b.status === "released");
+  const totalReleased = released.reduce((sum, b) => sum + b.amount, 0);
+  const uniqueMaintainers = new Set(bounties.map((b) => b.maintainer)).size;
+  const uniqueContributors = new Set(
+    bounties.filter((b) => b.contributor).map((b) => b.contributor as string),
+  ).size;
+  return {
+    totalBounties: bounties.length,
+    openCount: bounties.filter((b) => b.status === "open").length,
+    reservedCount: bounties.filter((b) => b.status === "reserved").length,
+    submittedCount: bounties.filter((b) => b.status === "submitted").length,
+    releasedCount: released.length,
+    refundedCount: bounties.filter((b) => b.status === "refunded").length,
+    expiredCount: bounties.filter((b) => b.status === "expired").length,
+    totalFunded,
+    totalReleased,
+    uniqueMaintainers,
+    uniqueContributors,
   };
 }

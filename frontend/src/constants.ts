@@ -80,23 +80,26 @@ export function readInitialFilters(): FilterState {
 }
 
 export interface Action {
-  type: "reserve" | "submit" | "release" | "refund";
+  action: "reserve" | "submit" | "release" | "refund";
   label: string;
+  title: string;
   requires: "contributor" | "maintainer";
 }
 
 export const actionCopy: Record<BountyStatus, Action[]> = {
   open: [
-    { type: "reserve", label: "Reserve", requires: "contributor" },
+    { action: "reserve", label: "Reserve", title: "Claim this bounty as a contributor.", requires: "contributor" },
   ],
   reserved: [
-    { type: "submit", label: "Submit", requires: "contributor" },
+    { action: "submit", label: "Submit", title: "Attach a pull request or demo link.", requires: "contributor" },
   ],
   submitted: [
-    { type: "release", label: "Release", requires: "maintainer" },
-    { type: "refund", label: "Refund", requires: "maintainer" },
+    { action: "release", label: "Release", title: "Release payout after review.", requires: "maintainer" },
+    { action: "refund", label: "Refund", title: "Refund escrow instead of releasing.", requires: "maintainer" },
   ],
   released: [],
   refunded: [],
-  expired: [],
+  expired: [
+    { action: "refund", label: "Refund", title: "Refund an expired bounty.", requires: "maintainer" },
+  ],
 };

@@ -31,10 +31,11 @@ import {
   reserveBounty,
   submitBounty,
 } from "./api";
+import SubmissionChecklistModal, { type SubmissionFormData } from "./SubmissionChecklistModal";
 import { BountyRecommendation, ContributorProfile, createDefaultProfile, generateRecommendations, updateProfileFromBounties } from "./recommendations";
 import RecommendedBounties from "./RecommendedBounties";
 import { statusCopy, actionCopy, readInitialFilters, FilterState, statusOptions, statusGlossary, sortOptions } from "./constants";
-import { filterBounties, getRewardBounds, getActiveRewardLabel, getContributorMetrics, getUniqueRepos, getRepoMetrics, sortBounties, debounce } from "./utils";
+import { filterBounties, getRewardBounds, getActiveRewardLabel, getContributorMetrics, getUniqueRepos, getRepoMetrics, sortBounties, debounce, SortOption, SortState } from "./utils";
 import { Bounty, CreateBountyPayload, OpenIssue, BountyStatus } from "./types";
 
 import GitHubIssuePreviewCard from "./GitHubIssuePreviewCard";
@@ -92,45 +93,6 @@ const contributorStatuses: Array<BountyStatus | "all"> = [
 
 type BountyAction = "reserve" | "submit" | "release" | "refund";
 
-const statusCopy: Record<BountyStatus, { label: string; description: string }> = {
-  open: {
-    label: "Open",
-    description: "Maintainer-funded and ready for a contributor to reserve.",
-  },
-  reserved: {
-    label: "Reserved",
-    description: "A contributor has claimed the work and is preparing a submission.",
-  },
-  submitted: {
-    label: "Submitted",
-    description: "The contributor has shared a PR link. Maintainer can release or refund.",
-  },
-  released: {
-    label: "Released",
-    description: "Escrow has been paid out to the contributor.",
-  },
-  refunded: {
-    label: "Refunded",
-    description: "Escrow has been returned to the maintainer.",
-  },
-  expired: {
-    label: "Expired",
-    description: "Deadline passed before completion. Maintainer can refund.",
-  },
-};
-
-const actionCopy: Record<BountyStatus, Array<{ action: BountyAction; label: string; title: string }>> = {
-  open: [{ action: "reserve", label: "Reserve", title: "Claim this bounty as a contributor." }],
-  reserved: [{ action: "submit", label: "Submit", title: "Attach a pull request or demo link." }],
-  submitted: [
-    { action: "release", label: "Release", title: "Release payout after review." },
-    { action: "refund", label: "Refund", title: "Refund escrow instead of releasing." },
-  ],
-  released: [],
-  refunded: [],
-  expired: [{ action: "refund", label: "Refund", title: "Refund an expired bounty." }],
-};
-
 function repoOwner(repo: string): string {
   return repo.split("/")[0] ?? repo;
 }
@@ -149,7 +111,7 @@ function App() {
   const [submitting, setSubmitting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-n
+
   const [searchQuery, setSearchQuery] = useState(initialFilters.searchQuery);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(initialFilters.searchQuery);
   
@@ -168,6 +130,12 @@ n
   const [pathname, setPathname] = useState(window.location.pathname);
   const [profileContributor, setProfileContributor] = useState("");
   const [profileStatus, setProfileStatus] = useState<"all" | BountyStatus>("all");
+
+  // Submission checklist modal state
+  const [submissionModalBounty, setSubmissionModalBounty] = useState<Bounty | null>(null);
+  const [submissionModalSubmitting, setSubmissionModalSubmitting] = useState(false);
+  const [submissionModalError, setSubmissionModalError] = useState<string | null>(null);
+  const [submissionModalData, setSubmissionModalData] = useState<Partial<SubmissionFormData> | undefined>(undefined);
 
 
 
@@ -283,22 +251,6 @@ n
   const uniqueRepos = useMemo(() => {
     return getUniqueRepos(bounties);
   }, [bounties]);
-
-  const groupedBounties = useMemo(() => {
-    if (repoRoute) {
-      // When on a repo-specific route, don't group - just show filtered bounties
-      return { [repoRoute.owner + '/' + repoRoute.name]: filteredBounties };
-    }
-    
-    const groups: Record<string, typeof filteredBounties> = {};
-    filteredBounties.forEach((bounty) => {
-      if (!groups[bounty.repo]) {
-        groups[bounty.repo] = [];
-      }
-      groups[bounty.repo].push(bounty);
-    });
-    return groups;
-  }, [filteredBounties, repoRoute]);
 
   const rewardBounds = useMemo(() => {
     return getRewardBounds(bounties);
@@ -425,11 +377,27 @@ n
       minReward,
       maxReward,
       repoFilter: effectiveRepoFilter,
+      sortOption,
+      sortDirection,
     });
     
     // Apply sorting
     return sortBounties(filtered, { option: sortOption, direction: sortDirection });
   }, [bounties, debouncedSearchQuery, statusFilter, minReward, maxReward, repoFilter, repoRoute, sortOption, sortDirection]);
+
+  const groupedBounties = useMemo(() => {
+    if (repoRoute) {
+      return { [repoRoute.owner + '/' + repoRoute.name]: filteredBounties };
+    }
+    const groups: Record<string, typeof filteredBounties> = {};
+    filteredBounties.forEach((bounty) => {
+      if (!groups[bounty.repo]) {
+        groups[bounty.repo] = [];
+      }
+      groups[bounty.repo].push(bounty);
+    });
+    return groups;
+  }, [filteredBounties, repoRoute]);
 
   if (detailId) {
     const bounty = detailBounty;
@@ -469,23 +437,33 @@ n
   }
 
   async function handleSubmit(bounty: Bounty) {
-    const contributor = window.prompt("Contributor Stellar address", bounty.contributor ?? "");
-    if (!contributor) return;
-    const contributorError = validateStellarPublicKey(contributor);
-    if (contributorError) {
-      window.alert(contributorError);
-      return;
-    }
-    const submissionUrl = window.prompt("Pull request or demo URL");
-    if (!submissionUrl) return;
-    const notes = window.prompt("Optional notes for the maintainer") ?? undefined;
+    setSubmissionModalBounty(bounty);
+    setSubmissionModalError(null);
+    // Preserve any previously entered data for this bounty
+    setSubmissionModalData(undefined);
+  }
 
+  async function handleSubmissionConfirm(data: SubmissionFormData) {
+    if (!submissionModalBounty) return;
+    setSubmissionModalSubmitting(true);
+    setSubmissionModalError(null);
+    // Preserve entered data so it survives a failed submission
+    setSubmissionModalData(data);
     try {
       setError(null);
-      await submitBounty(bounty.id, contributor.trim(), submissionUrl, notes);
+      await submitBounty(
+        submissionModalBounty.id,
+        data.contributor,
+        data.prLink,
+        data.notes || undefined,
+      );
+      setSubmissionModalBounty(null);
+      setSubmissionModalData(undefined);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit bounty.");
+      setSubmissionModalError(err instanceof Error ? err.message : "Failed to submit bounty.");
+    } finally {
+      setSubmissionModalSubmitting(false);
     }
   }
 
@@ -1057,6 +1035,8 @@ n
               </div>
             </div>
           ))}
+            </div>
+          ) : (
             <div className="empty-state">
               <div className="empty-state__content">
                 <h3>No bounties found</h3>
@@ -1271,6 +1251,22 @@ n
           </div>
         )}
       </section>
+
+      {submissionModalBounty && (
+        <SubmissionChecklistModal
+          bounty={submissionModalBounty}
+          initialData={submissionModalData}
+          submitting={submissionModalSubmitting}
+          error={submissionModalError}
+          onSubmit={(data) => void handleSubmissionConfirm(data)}
+          onClose={() => {
+            if (!submissionModalSubmitting) {
+              setSubmissionModalBounty(null);
+              setSubmissionModalError(null);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

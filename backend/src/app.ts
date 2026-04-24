@@ -32,6 +32,14 @@ export const app = express();
 
 app.use(cors());
 
+// Parse JSON bodies; capture raw body for webhook signature verification
+app.use(
+  express.json({
+    verify: captureRawBody,
+  }),
+);
+app.use(requestContextMiddleware);
+
 
 function parseId(raw: string | string[] | undefined): string {
   return bountyIdSchema.parse(Array.isArray(raw) ? raw[0] : raw);
