@@ -228,16 +228,20 @@ impl StellarBountyBoardContract {
     pub fn refund_bounty(env: Env, bounty_id: u64, maintainer: Address) {
         maintainer.require_auth();
         let mut bounty = read_bounty(&env, bounty_id);
-        expire_if_needed(&env, &mut bounty);
-
+        
         if bounty.maintainer != maintainer {
             panic!("maintainer mismatch");
         }
+
+        // Finalized bounties cannot be refunded
         if bounty.status == BountyStatus::Released || bounty.status == BountyStatus::Refunded {
             panic!("bounty already finalized");
         }
-        if bounty.status == BountyStatus::Submitted {
-            panic!("submitted bounty cannot be refunded");
+
+        // Active/Submitted bounties can ONLY be refunded if expired
+        let now = env.ledger().timestamp();
+        if now <= bounty.deadline && bounty.deadline != 0 {
+            panic!("bounty not expired yet");
         }
 
         let token_client = TokenClient::new(&env, &bounty.token);

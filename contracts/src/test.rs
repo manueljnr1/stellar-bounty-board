@@ -139,6 +139,7 @@ fn test_refund_flow() {
     let token_admin = soroban_sdk::token::StellarAssetClient::new(&env, &token_id);
     token_admin.mint(&maintainer, &1000);
 
+    let deadline = env.ledger().timestamp() + 1000;
     let bounty_id = client.create_bounty(
         &maintainer,
         &token_id,
@@ -146,10 +147,14 @@ fn test_refund_flow() {
         &String::from_str(&env, "repo"),
         &1,
         &String::from_str(&env, "title"),
-        &(env.ledger().timestamp() + 1000),
+        &deadline,
     );
 
-    // Refund while Open
+    // Refund after expiration
+    env.ledger().with_mut(|li| {
+        li.timestamp = deadline + 1;
+    });
+
     client.refund_bounty(&bounty_id, &maintainer);
     let bounty = client.get_bounty(&bounty_id);
     assert_eq!(bounty.status, BountyStatus::Refunded);
