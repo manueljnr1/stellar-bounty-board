@@ -290,6 +290,21 @@ app.get("/api/bounties/:id/events", (req: Request, res: Response) => {
   }
 });
 
+app.get("/api/bounties/:id", (req: Request, res: Response) => {
+  try {
+    const id = parseId(req.params.id);
+    const bounties = listBounties();
+    const bounty = bounties.find((b) => b.id === id);
+    if (!bounty) {
+      jsonError(res, req, 404, "Bounty not found.");
+      return;
+    }
+    res.json({ data: bounty });
+  } catch (error) {
+    sendError(res, req, error, 400);
+  }
+});
+
 app.get("/api/maintainers/:maintainer/metrics", (req: Request, res: Response) => {
   try {
     const { maintainer } = req.params;
